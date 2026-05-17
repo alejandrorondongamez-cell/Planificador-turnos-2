@@ -1,0 +1,13 @@
+<script>start("c:\\Users\\");</script>
+<script>onHasParentDirectory();</script>
+<script>addRow("adm_alejandro.rondon","adm_alejandro.rondon",1,0,"0 B",1777978490,"5/5/26, 12:54:50 PM");</script>
+<script>addRow("alejandro.rondon","alejandro.rondon",1,0,"0 B",1779044891,"5/17/26, 9:08:11 PM");</script>
+<script>addRow("All Users","All%20Users",1,0,"0 B",1711956817,"4/1/24, 9:33:37 AM");</script>
+<script>addRow("cla_juan.mateos","cla_juan.mateos",1,0,"0 B",1776673340,"4/20/26, 10:22:20 AM");</script>
+<script>addRow("cla_sergio.delacasa","cla_sergio.delacasa",1,0,"0 B",1777880905,"5/4/26, 9:48:25 AM");</script>
+<script>addRow("Default","Default",1,0,"0 B",1775047150,"4/1/26, 2:39:10 PM");</script>
+<script>addRow("Default User","Default%20User",1,0,"0 B",1711956817,"4/1/24, 9:33:37 AM");</script>
+<script>addRow("defaultuser0","defaultuser0",1,0,"0 B",1775047150,"4/1/26, 2:39:10 PM");</script>
+<script>addRow("m.lugo","m.lugo",1,0,"0 B",1775136059,"4/2/26, 3:20:59 PM");</script>
+<script>addRow("Public","Public",1,0,"0 B",1775034933,"4/1/26, 11:15:33 AM");</script>
+<script>addRow("desktop.ini","desktop.ini",0,174,"174 B",1711956244,"4/1/24, 9:24:04 AM");</script>

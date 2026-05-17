@@ -1,0 +1,10 @@
+[
+  {"id": "u1", "name": "Max Sendra", "profile": "senior", "role": "user", "vacationDaysTotal": 26, "joinDate": "2025-01-01"},
+  {"id": "u2", "name": "Carlos Guerrero", "profile": "standard", "role": "user", "vacationDaysTotal": 26, "joinDate": "2025-01-01"},
+  {"id": "u3", "name": "Alejandro G. Torres", "profile": "senior", "role": "user", "vacationDaysTotal": 26, "joinDate": "2025-01-01"},
+  {"id": "u4", "name": "Sergio de la Casa Redondo", "profile": "standard", "role": "user", "vacationDaysTotal": 26, "joinDate": "2025-01-01"},
+  {"id": "u5", "name": "Alejandro G. Valdes", "profile": "senior", "role": "user", "vacationDaysTotal": 18, "joinDate": "2026-05-01"},
+  {"id": "u6", "name": "Hector Adarbe", "profile": "standard", "role": "user", "vacationDaysTotal": 26, "joinDate": "2025-01-01"},
+  {"id": "u7", "name": "Pablo Terron", "profile": "senior", "role": "user", "vacationDaysTotal": 26, "joinDate": "2025-01-01"},
+  {"id": "u8", "name": "Alejandro Lopez", "profile": "standard", "role": "user", "vacationDaysTotal": 18, "joinDate": "2026-05-01"}
+]

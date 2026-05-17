@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aequitas WFM - Enterprise IT Scheduler</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500/30">
+    
+    <header class="border-b border-slate-800/80 p-4 flex justify-between bg-slate-900/40 backdrop-blur shadow-2xl sticky top-0 z-40 px-6">
+        <div class="flex items-center space-x-3">
+            <div class="h-9 w-9 bg-indigo-600 flex items-center justify-center rounded-xl font-black text-white shadow-lg shadow-indigo-600/20">Æ</div>
+            <div>
+                <h1 class="text-xs font-black tracking-widest text-white">AEQUITAS WFM</h1>
+                <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Premium IT Workforce Monitor</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span id="admin-indicator" class="hidden text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2.5 py-1 rounded-lg font-bold uppercase tracking-wider">Modo Administrador Activo</span>
+            <button id="admin-action-btn" onclick="toggleAdminMode()" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-xs font-bold border border-slate-700/50 transition">Modo Administrador</button>
+        </div>
+    </header>
+
+    <main class="flex-1 p-6 max-w-[1600px] w-full mx-auto grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <section class="xl:col-span-3 space-y-4">
+            <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl flex justify-between items-center flex-wrap gap-3 shadow-xl">
+                <div class="flex items-center space-x-2">
+                    <button onclick="navigateTime(-1)" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition">&lt;</button>
+                    <span id="workspace-title" class="text-xs font-black min-w-[120px] text-center tracking-wider text-slate-300">JULIO 2026</span>
+                    <button onclick="navigateTime(1)" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition">&gt;</button>
+                </div>
+                <div class="flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl">
+                    <button onclick="switchView('month')" class="bg-indigo-600 text-white px-4 py-1.5 text-xs font-bold rounded-lg shadow-md">Mes</button>
+                    <button onclick="switchView('week')" class="text-slate-400 hover:text-white px-4 py-1.5 text-xs font-bold rounded-lg transition">Semana</button>
+                </div>
+                <div class="flex space-x-2 items-center">
+                    <button onclick="openVacationManagementModal()" class="bg-slate-800 hover:bg-slate-700 text-xs font-bold px-3.5 py-1.5 rounded-xl border border-slate-700/40 transition">Vacaciones</button>
+                    <button onclick="openGeneratorRangeModal()" class="bg-emerald-600 hover:bg-emerald-500 text-xs font-bold px-4 py-1.5 rounded-xl text-white shadow-lg shadow-emerald-600/10 transition">Auto-Generador</button>
+                    <button onclick="handleExportDropdownAction('month')" class="bg-slate-800 hover:bg-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-slate-700/40 transition">CSV Mes</button>
+                    <button onclick="handleExportDropdownAction('year')" class="bg-slate-800 hover:bg-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-slate-700/40 transition">CSV Año Audit</button>
+                </div>
+            </div>
+            <div id="active-rules-container" class="hidden bg-slate-900 border border-slate-800 p-3 rounded-xl text-[10px] text-slate-400 font-medium tracking-wide shadow-inner">
+                • REGLAS DEL MOTOR ACTIVAS: Bloqueos de turnos cruzados • Alicante Base Legal • Mínimo 12h descanso entre jornadas • Filtro restrictivo de volumen Madrid.
+            </div>
+            <div id="calendar-grid-workspace" class="bg-slate-900/40 border border-slate-800/80 p-4 rounded-2xl min-h-[500px] shadow-2xl"></div>
+        </section>
+        
+        <section class="space-y-4">
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col">
+                <h3 class="text-xs font-black border-b border-slate-800 pb-2.5 text-slate-400 tracking-widest uppercase">Auditoría de Equidad Anual</h3>
+                <div id="equidad-widget-container" class="space-y-2 mt-4 max-h-[550px] overflow-y-auto pr-1"></div>
+            </div>
+        </section>
+    </main>
+
+    <div id="login-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-xs w-full text-center space-y-4 shadow-2xl">
+            <h4 class="text-xs font-black text-slate-300 tracking-wider uppercase">Acceso Administrador</h4>
+            <input type="password" id="admin-password-input" class="w-full p-2.5 bg-slate-950 border border-slate-800 text-sm rounded-xl text-center focus:outline-none focus:border-indigo-500 text-white font-mono" placeholder="••••••••">
+            <div class="flex gap-2 text-xs font-bold"><button onclick="document.getElementById('login-modal').classList.add('hidden')" class="w-1/2 bg-slate-800 p-2.5 rounded-xl transition">Cerrar</button><button onclick="handleAdminLoginSubmit()" class="w-1/2 bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-600/10 transition">Acceder</button></div>
+        </div>
+    </div>
+
+    <div id="generator-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-sm w-full space-y-4 shadow-2xl">
+            <h4 class="text-xs font-black text-slate-300 tracking-wider uppercase">Auto-Generador Inteligente</h4>
+            <div class="grid grid-cols-2 gap-3 text-[11px] text-slate-400">
+                <div><label class="font-medium">Inicio (Lun):</label><input type="date" id="gen-start-date" class="w-full bg-slate-950 border border-slate-800 p-2 mt-1 rounded-xl text-white focus:outline-none"></div>
+                <div><label class="font-medium">Fin (Dom):</label><input type="date" id="gen-end-date" class="w-full bg-slate-950 border border-slate-800 p-2 mt-1 rounded-xl text-white focus:outline-none"></div>
+            </div>
+            <button onclick="handleAutoGenerateTrigger()" class="w-full bg-emerald-600 font-bold py-2.5 rounded-xl text-xs text-white transition shadow-lg shadow-emerald-600/10">Computar Cuadrante</button>
+            <button onclick="document.getElementById('generator-modal').classList.add('hidden')" class="w-full bg-slate-800 text-xs py-2 rounded-xl border border-slate-700/50 transition">Cancelar</button>
+        </div>
+    </div>
+
+    <div id="vacation-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full space-y-4 flex flex-col max-h-[80vh] shadow-2xl">
+            <h4 class="text-xs font-black text-slate-300 tracking-wider uppercase">Planificador de Vacaciones</h4>
+            <div class="bg-slate-950 p-3 border border-slate-800/80 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px] text-slate-400">
+                <div><label>Técnico:</label><select id="vac-user-select" class="w-full bg-slate-900 text-white border border-slate-800 mt-1 p-1 rounded-lg focus:outline-none"></select></div>
+                <div><label>Desde (Lun):</label><input type="date" id="vac-start-date" class="w-full bg-slate-900 text-white border border-slate-800 mt-1 p-1 rounded-lg focus:outline-none"></div>
+                <div><label>Hasta (Dom):</label><input type="date" id="vac-end-date" class="w-full bg-slate-900 text-white border border-slate-800 mt-1 p-1 rounded-lg focus:outline-none"></div>
+            </div>
+            <button onclick="handleAddVacationSubmit()" class="bg-indigo-600 py-2 text-xs font-bold rounded-xl transition shadow-lg shadow-indigo-600/10">Inscribir Periodo</button>
+            <div id="active-vacations-list" class="flex-1 overflow-y-auto space-y-1.5 pr-1 min-h-[150px]"></div>
+            <button onclick="document.getElementById('vacation-modal').classList.add('hidden')" class="bg-slate-800 text-xs py-2 rounded-xl transition">Cerrar Ventana</button>
+        </div>
+    </div>
+
+    <div id="manual-edit-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-sm w-full space-y-4 shadow-2xl">
+            <h4 id="manual-edit-modal-title" class="text-xs font-black text-slate-300 tracking-wider uppercase">Asignación Manual</h4>
+            <div id="manual-users-assignment-list" class="max-h-[250px] overflow-y-auto space-y-1 pr-1"></div>
+            <button onclick="handleSaveManualEditSubmit()" class="w-full bg-indigo-600 font-bold py-2.5 rounded-xl text-xs text-white transition shadow-lg shadow-indigo-600/10">Fijar Cambios</button>
+            <button onclick="document.getElementById('manual-edit-modal').classList.add('hidden')" class="w-full bg-slate-800 text-xs py-2 rounded-xl border border-slate-700/50 transition">Descartar</button>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/rules.js"></script>
+    <script src="js/scheduler.js"></script>
+    <script src="js/report.js"></script>
+    <script src="js/github.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

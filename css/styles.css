@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+
+.tooltip-trigger:hover .tooltip-content {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) translateX(-50%);
+}
+
+.tooltip-content {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px) translateX(-50%);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.calendar-grid-cell {
+    min-height: 115px;
+    transition: all 0.2s ease;
+}

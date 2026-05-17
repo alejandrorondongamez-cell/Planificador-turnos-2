@@ -1,0 +1,21 @@
+{
+  "adminPasswordHash": "240eb52deeeab0c310431b34cd8ab4f39c87ed6034b0cf64d3000b2cdbe9b081",
+  "shifts": {
+    "mañana": {"hours": 9, "label": "Mañana (08:00-17:00)"},
+    "tarde": {"hours": 9, "label": "Tarde (15:00-24:00)"}
+  },
+  "coverage": {
+    "standard": {"morning": 6, "afternoon": 2, "minMorning": 4, "minAfternoon": 2},
+    "national_holiday": {"morning": 2, "afternoon": 2, "minMorning": 2, "minAfternoon": 2},
+    "regional_holiday": {"morning": 4, "afternoon": 2, "minMorning": 4, "minAfternoon": 2},
+    "global_closure": {"morning": 0, "afternoon": 0, "minMorning": 0, "minAfternoon": 0}
+  },
+  "scoringWeights": {
+    "consecutiveTarde": 999999,
+    "threeWeeksInMonth": 888888,
+    "twoWeeksInMonth": 5000,
+    "annualTardeHours": 100,
+    "annualLegalHolidays": 50,
+    "monthTardeWeeks": 500
+  }
+}
