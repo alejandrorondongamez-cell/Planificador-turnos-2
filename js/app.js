@@ -7,7 +7,6 @@ async function initializeApplication() {
     const cacheBust = `?v=${Date.now()}`;
     
     try {
-        // Sincronización limpia: Forzar siempre la lectura de los archivos estructurales desde GitHub sin caché
         const [cRes, uRes, hRes] = await Promise.all([
             fetch(`data/config.json${cacheBust}`),
             fetch(`data/users.json${cacheBust}`),
@@ -18,7 +17,6 @@ async function initializeApplication() {
         appState.users = await uRes.json();
         appState.holidays = await hRes.json();
 
-        // Cargar únicamente el estado operativo editable (cuadrantes y vacaciones) desde la memoria local
         if (local) {
             appState.schedule = local.schedule || {};
             appState.vacaciones = local.vacaciones || [];
@@ -32,10 +30,9 @@ async function initializeApplication() {
         console.error("Error crítico de inicialización de datos desde el repositorio:", e); 
     }
 
-    // Interceptor dinámico controlado para evitar la duplicación de eventos de la tecla Enter
     const passwordInput = document.getElementById("admin-password-input");
     if (passwordInput) {
-        passwordInput.removeAttribute("onkeydown"); // Eliminamos posibles residuos inline redundantes
+        passwordInput.removeAttribute("onkeydown");
         passwordInput.addEventListener("keydown", (event) => {
             if (event.key === "Enter") {
                 event.preventDefault();
@@ -67,11 +64,10 @@ function toggleAdminMode() {
 
 async function handleAdminLoginSubmit() {
     const inp = document.getElementById("admin-password-input");
-    if (!inp || !inp.value || inp.value.trim() === "") return; // Protección total contra la doble ejecución vacía
+    if (!inp || !inp.value || inp.value.trim() === "") return;
 
     const plainPassword = inp.value;
-    inp.value = ""; // Limpieza inmediata del campo de texto por máxima seguridad corporativa
-    
+    inp.value = "";
     const hash = await Utils.hashPassword(plainPassword);
     
     if (hash === appState.config.adminPasswordHash) {
@@ -125,8 +121,10 @@ function buildDayCellHtml(date, dStr, targetMonth) {
     const mNames = dayData.mañana.map(id => appState.users.find(u => u.id === id)?.name || id).join(', ') || 'Ninguno';
     const tNames = dayData.tarde.map(id => appState.users.find(u => u.id === id)?.name || id).join(', ') || 'Ninguno';
 
+    let borderAlert = dayData.hardViolation ? "border-rose-500/50 bg-rose-950/10" : "";
+
     return `
-        <div onclick="openManualEditModal('${dStr}')" class="calendar-grid-cell p-3 rounded-xl border border-slate-800/80 ${isCur?'bg-slate-900':'bg-slate-900/40 text-slate-600'} cursor-pointer hover:border-indigo-500/50 tooltip-trigger relative group shadow-inner">
+        <div onclick="openManualEditModal('${dStr}')" class="calendar-grid-cell p-3 rounded-xl border ${borderAlert ? borderAlert : 'border-slate-800/80'} ${isCur && !borderAlert ? 'bg-slate-900' : !isCur && !borderAlert ? 'bg-slate-900/40 text-slate-600' : ''} cursor-pointer hover:border-indigo-500/50 tooltip-trigger relative group shadow-inner">
             <div class='flex justify-between items-center'><span class='text-xs font-bold'>${date.getDate()}</span>${badge}</div>
             <div class='mt-2 text-[10px] space-y-1'>
                 ${dayData.tarde.length > 0 ? `<div class='bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded truncate font-medium'>Tarde: ${dayData.tarde.length}</div>` : ''}
@@ -139,6 +137,7 @@ function buildDayCellHtml(date, dStr, targetMonth) {
                 <div class="font-bold text-indigo-400">${dStr}</div>
                 <div><span class="text-emerald-400 font-medium">Mañana:</span> ${mNames}</div>
                 <div><span class="text-indigo-400 font-medium">Tarde:</span> ${tNames}</div>
+                ${dayData.hardViolation ? `<div class="text-rose-400 font-bold pt-1 border-t border-slate-800">⚠️ Requiere corrección manual</div>` : ''}
             </div>
         </div>`;
 }
@@ -166,14 +165,34 @@ function handleAutoGenerateTrigger() {
     if(!appState.isAdmin) return alert("Acceso denegado: Habilite el modo Administrador.");
     const s = document.getElementById("gen-start-date").value, e = document.getElementById("gen-end-date").value;
     if(!s || !e) return alert("Por favor, introduzca un rango de fechas coherente.");
-    let curr = Utils.getMondayOfDate(new Date(s)), limit = new Date(e);
+    
+    let curr = Utils.getMondayOfDate(Utils.parseLocalDate(s));
+    let limit = Utils.parseLocalDate(e);
     let count = 0;
+    let fallbackWarnings = [];
+
     while(curr <= limit) {
         const res = Scheduler.generateWeeklyBlock(curr, appState);
-        if(res.success) { appState.schedule = { ...appState.schedule, ...res.assignments }; count++; }
+        if(res.success) { 
+            appState.schedule = { ...appState.schedule, ...res.assignments }; 
+            if (res.hardViolation) {
+                fallbackWarnings.push(`Semana ${Utils.getWeekNumber(curr)}: ${res.msg}`);
+            }
+            count++; 
+        } else {
+            fallbackWarnings.push(`Semana ${Utils.getWeekNumber(curr)}: ${res.msg}`);
+        }
         curr.setDate(curr.getDate() + 7);
     }
-    GitHubSync.saveLocalState(appState); renderMainWorkspace(); alert(`Planificación completada con éxito para ${count} semanas.`);
+    
+    GitHubSync.saveLocalState(appState); 
+    renderMainWorkspace(); 
+    
+    if (fallbackWarnings.length > 0) {
+        alert(`Planificación procesada para ${count} semanas.\n\n[AVISO DE REVISIÓN MANUAL]:\n` + fallbackWarnings.join("\n"));
+    } else {
+        alert(`Planificación completada con éxito para ${count} semanas sin conflictos de restricciones.`);
+    }
 }
 
 function openVacationManagementModal() { document.getElementById("vacation-modal").classList.remove("hidden"); renderVacationModalList(); }
