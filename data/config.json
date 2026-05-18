@@ -1,5 +1,5 @@
 {
-  "adminPasswordHash": "240eb52deeeab0c310431b34cd8ab4f39c87ed6034b0cf64d3000b2cdbe9b081",
+  "adminPasswordHash": "64535eae042bd308cc01e23125abfe7c05e2fe6b28b400b342c8d65105278171",
   "shifts": {
     "mañana": {"hours": 9, "label": "Mañana (08:00-17:00)"},
     "tarde": {"hours": 9, "label": "Tarde (15:00-24:00)"}
