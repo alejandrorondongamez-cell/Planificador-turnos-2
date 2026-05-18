@@ -1,6 +1,6 @@
 /**
  * AEQUITAS WFM - CORE SCHEDULING ENGINE
- * ROMS & CONSTRAINT VALIDATOR - VERSION v0.3 PRO
+ * ROMS & HARD CONSTRAINT CASCADING VALIDATOR - VERSION v0.5 PRO
  */
 const Scheduler = {
     generateWeeklyBlock(mondayDate, state) {
@@ -8,17 +8,14 @@ const Scheduler = {
         const users = state.users;
         const holidays = state.holidays;
         
-        // Clonar la fecha para evitar mutaciones de punteros en los bucles superiores
         const baseMonday = new Date(mondayDate.getFullYear(), mondayDate.getMonth(), mondayDate.getDate(), 0, 0, 0, 0);
         const weekDates = Utils.getDatesForWeekByMonday(baseMonday);
         const currentYear = baseMonday.getFullYear();
         const weekNum = Utils.getWeekNumber(baseMonday);
         
-        // Calcular el mes de corte real usando el jueves de la semana en curso (Norma ISO)
         const midWeekDate = new Date(baseMonday.getFullYear(), baseMonday.getMonth(), baseMonday.getDate() + 3);
         const currentMonth = midWeekDate.getMonth();
 
-        // 1. Detectar técnicos de vacaciones en este bloque semanal
         const unavailableTechs = new Set();
         weekDates.forEach(dateStr => {
             if (state.vacaciones && Array.isArray(state.vacaciones)) {
@@ -34,29 +31,46 @@ const Scheduler = {
         const seniors = availableTechs.filter(u => u.profile === "senior");
         const standards = availableTechs.filter(u => u.profile === "standard");
         
-        // 2. Extraer métricas históricas de balance de carga anual limpia
         const historyStats = this.computeHistoricalStats(state, currentYear, weekNum, currentMonth);
 
         let bestPair = null;
         let minCombinedScore = Infinity;
         let hardViolationTriggered = false;
 
-        // 3. Ejecutar emparejamiento reglamentario (1 Senior + 1 Standard)
+        // TIER 1: Buscar combinación corporativa perfecta (1 Senior + 1 Standard) respetando restricciones duras
         for (let s of seniors) {
             for (let st of standards) {
                 const sPen = this.calculateTechnicianPenalty(s, historyStats[s.id], weekNum, config);
                 const stPen = this.calculateTechnicianPenalty(st, historyStats[st.id], weekNum, config);
                 let pairScore = sPen.score + stPen.score;
 
-                if (pairScore < minCombinedScore) {
+                if (pairScore < minCombinedScore && pairScore < config.scoringWeights.consecutiveTarde) {
                     minCombinedScore = pairScore;
                     bestPair = { senior: s, standard: st };
                 }
             }
         }
 
-        // 4. Mecanismo de Fallback de Cobertura: Romper restricciones blandas si las vacaciones impiden un par limpio
-        if (!bestPair || minCombinedScore >= config.scoringWeights.consecutiveTarde) {
+        // TIER 2: Si no hay par ideal por vacaciones, forzar par (Senior+Standard) asumiendo penalización controlada
+        if (!bestPair) {
+            minCombinedScore = Infinity;
+            for (let s of seniors) {
+                for (let st of standards) {
+                    const sPen = this.calculateTechnicianPenalty(s, historyStats[s.id], weekNum, config);
+                    const stPen = this.calculateTechnicianPenalty(st, historyStats[st.id], weekNum, config);
+                    let pairScore = sPen.score + stPen.score;
+
+                    if (pairScore < minCombinedScore) {
+                        minCombinedScore = pairScore;
+                        bestPair = { senior: s, standard: st };
+                        hardViolationTriggered = true;
+                    }
+                }
+            }
+        }
+
+        // TIER 3: Emergencia total por ausencias simultáneas (Asignar cualquier par disponible)
+        if (!bestPair) {
             hardViolationTriggered = true;
             if (availableTechs.length >= 2) {
                 minCombinedScore = Infinity;
@@ -77,17 +91,14 @@ const Scheduler = {
             }
         }
 
-        // Si es matemáticamente imposible cubrir el servicio (menos de 2 personas totales libres)
         if (!bestPair) {
-            return { success: false, msg: "Fallo crítico: No hay personal suficiente para cubrir las alertas mínimas del servicio." };
+            return { success: false, msg: "Personal crítico insuficiente (menos de 2 técnicos disponibles)." };
         }
 
-        // 5. Inyectar asignación estructural de turnos semanales estables
         const weeklyAssignments = {};
         weekDates.forEach(dateStr => {
             const dayHoliday = holidays[dateStr];
             
-            // Si el día es de cierre global estricto, el cuadrante se vacía automáticamente
             if (dayHoliday && dayHoliday.type === "global") {
                 weeklyAssignments[dateStr] = { mañana: [], tarde: [], vacaciones: users.map(u => u.id), hardViolation: false };
                 return;
@@ -118,7 +129,7 @@ const Scheduler = {
             success: true, 
             assignments: weeklyAssignments, 
             hardViolation: hardViolationTriggered,
-            msg: "Asignación forzada por solapamiento de ausencias."
+            msg: "Asignación forzada bajo balanceo por contingencia de vacaciones."
         };
     },
 
@@ -159,7 +170,7 @@ const Scheduler = {
                 
                 if (!processedWeeks.has(`annual-${wk}-${uid}`)) {
                     stats[uid].annualTardeWeeks++;
-                    processedWeeks.add(`annual-${wk}-${wk}-${uid}`);
+                    processedWeeks.add(`annual-${wk}-${uid}`);
                 }
                 
                 if (wk === targetWeek - 1) stats[uid].lastWeekTarde = wk;
@@ -168,7 +179,7 @@ const Scheduler = {
                 if (mid.getMonth() === targetMonth) {
                     if (!processedWeeks.has(`month-${targetMonth}-${wk}-${uid}`)) {
                         stats[uid].tardeWeeksInCurrentMonth++;
-                        processedWeeks.add(`month-${targetMonth}-${wk}-${uid}`); // Hotfix: Sincronización de claves corregida
+                        processedWeeks.add(`month-${targetMonth}-${wk}-${uid}`);
                     }
                 }
                 if (state.holidays[dateStr] && state.holidays[dateStr].type === "legal") {
