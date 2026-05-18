@@ -1,10 +1,8 @@
 const Utils = {
-    getWeekNumber(date) {
-        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-        const dayNum = d.getUTCDay() || 7;
-        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    // Parser seguro: Aísla la fecha rompiendo la cadena de texto para evitar desfases de zonas horarias
+    parseLocalDate(dateStr) {
+        const [y, m, d] = dateStr.split("-").map(Number);
+        return new Date(y, m - 1, d, 0, 0, 0, 0);
     },
 
     formatDate(date) {
@@ -14,23 +12,30 @@ const Utils = {
         return `${y}-${m}-${d}`;
     },
 
-    getDatesForWeekByMonday(mondayDate) {
-        const dates = [];
-        for(let i=0; i<7; i++) {
-            let d = new Date(mondayDate);
-            d.setDate(mondayDate.getDate() + i);
-            dates.push(this.formatDate(d));
-        }
-        return dates;
-    },
-
     getMondayOfDate(date) {
-        const d = new Date(date);
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
         const day = d.getDay();
         const diff = d.getDate() - day + (day === 0 ? -6 : 1);
         return new Date(d.setDate(diff));
     },
 
+    getDatesForWeekByMonday(mondayDate) {
+        const dates = [];
+        for(let i = 0; i < 7; i++) {
+            let d = new Date(mondayDate.getFullYear(), mondayDate.getMonth(), mondayDate.getDate() + i, 0, 0, 0, 0);
+            dates.push(this.formatDate(d));
+        }
+        return dates;
+    },
+
+    getWeekNumber(date) {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    },
+    
     async hashPassword(password) {
         const encoder = new TextEncoder();
         const data = encoder.encode(password);
