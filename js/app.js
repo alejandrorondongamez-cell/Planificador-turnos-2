@@ -4,16 +4,24 @@ document.addEventListener("DOMContentLoaded", async () => { await initializeAppl
 
 async function initializeApplication() {
     const local = GitHubSync.loadLocalState();
-    if (local) { 
-        appState = { ...appState, ...local }; 
-        appState.currentDate = new Date(appState.currentDate); 
-    } else {
-        try {
+    try {
+        // Hotfix: Forzar siempre la lectura del archivo config.json fresco desde el servidor
+        const cRes = await fetch("data/config.json"); 
+        const freshConfig = await cRes.json();
+
+        if (local) { 
+            appState = { ...appState, ...local }; 
+            appState.currentDate = new Date(appState.currentDate); 
+            // Sobrescribimos la configuración con la del archivo real para evitar bloqueos por caché local
+            appState.config = freshConfig;
+        } else {
             const uRes = await fetch("data/users.json"); appState.users = await uRes.json();
             const hRes = await fetch("data/holidays.json"); appState.holidays = await hRes.json();
-            const cRes = await fetch("data/config.json"); appState.config = await cRes.json();
+            appState.config = freshConfig;
             GitHubSync.saveLocalState(appState);
-        } catch(e) { console.error(e); }
+        }
+    } catch(e) { 
+        console.error("Error al inicializar la base de datos estática:", e); 
     }
     renderHeader(); renderActiveRulesPanel(); renderMainWorkspace(); renderEquidadWidget();
 }
