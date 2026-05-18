@@ -1,3 +1,7 @@
+/**
+ * AEQUITAS WFM - MAIN VIEW PORT CONTROLLER
+ * INTERFACE ORCHESTRATOR - VERSION v0.3 PRO
+ */
 let appState = { users: [], holidays: [], config: {}, schedule: {}, vacaciones: [], currentDate: new Date("2026-07-01"), currentView: "month", isAdmin: false };
 
 document.addEventListener("DOMContentLoaded", async () => { await initializeApplication(); });
@@ -137,7 +141,7 @@ function buildDayCellHtml(date, dStr, targetMonth) {
                 <div class="font-bold text-indigo-400">${dStr}</div>
                 <div><span class="text-emerald-400 font-medium">Mañana:</span> ${mNames}</div>
                 <div><span class="text-indigo-400 font-medium">Tarde:</span> ${tNames}</div>
-                ${dayData.hardViolation ? `<div class="text-rose-400 font-bold pt-1 border-t border-slate-800">⚠️ Requiere corrección manual</div>` : ''}
+                ${dayData.hardViolation ? `<div class="text-rose-400 font-bold pt-1 border-t border-slate-800">⚠️ Solapamiento: Forzado Fallback</div>` : ''}
             </div>
         </div>`;
 }
@@ -182,16 +186,18 @@ function handleAutoGenerateTrigger() {
         } else {
             fallbackWarnings.push(`Semana ${Utils.getWeekNumber(curr)}: ${res.msg}`);
         }
-        curr.setDate(curr.getDate() + 7);
+        // Avanzar el bucle de forma limpia instanciando una nueva referencia de fecha
+        curr = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate() + 7, 0, 0, 0, 0);
     }
     
     GitHubSync.saveLocalState(appState); 
+    document.getElementById("generator-modal").classList.add("hidden"); // Hotfix: Cierre automático de modal añadido
     renderMainWorkspace(); 
     
     if (fallbackWarnings.length > 0) {
-        alert(`Planificación procesada para ${count} semanas.\n\n[AVISO DE REVISIÓN MANUAL]:\n` + fallbackWarnings.join("\n"));
+        alert(`Planificación procesada para ${count} semanas.\n\n[AVISO DE AJUSTE MANUAL]:\n` + fallbackWarnings.join("\n"));
     } else {
-        alert(`Planificación completada con éxito para ${count} semanas sin conflictos de restricciones.`);
+        alert(`Planificación completada con éxito para ${count} semanas sin conflictos.`);
     }
 }
 
