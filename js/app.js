@@ -1,6 +1,6 @@
 /**
  * AEQUITAS WFM - MAIN VIEW PORT CONTROLLER
- * INTERFACE ORCHESTRATOR - VERSION v0.3 PRO
+ * GLOBAL SCOPE INJECTION ARCHITECTURE - VERSION v0.5 PRO
  */
 let appState = { users: [], holidays: [], config: {}, schedule: {}, vacaciones: [], currentDate: new Date("2026-07-01"), currentView: "month", isAdmin: false };
 
@@ -11,6 +11,7 @@ async function initializeApplication() {
     const cacheBust = `?v=${Date.now()}`;
     
     try {
+        // Sincronización limpia: Forzar siempre la lectura de los archivos estructurales desde GitHub sin caché
         const [cRes, uRes, hRes] = await Promise.all([
             fetch(`data/config.json${cacheBust}`),
             fetch(`data/users.json${cacheBust}`),
@@ -21,6 +22,7 @@ async function initializeApplication() {
         appState.users = await uRes.json();
         appState.holidays = await hRes.json();
 
+        // Cargar únicamente el estado operativo editable (cuadrantes y vacaciones) desde la memoria local
         if (local) {
             appState.schedule = local.schedule || {};
             appState.vacaciones = local.vacaciones || [];
@@ -34,13 +36,14 @@ async function initializeApplication() {
         console.error("Error crítico de inicialización de datos desde el repositorio:", e); 
     }
 
+    // Interceptor dinámico controlado para evitar la duplicación de eventos de la tecla Enter
     const passwordInput = document.getElementById("admin-password-input");
     if (passwordInput) {
         passwordInput.removeAttribute("onkeydown");
         passwordInput.addEventListener("keydown", (event) => {
             if (event.key === "Enter") {
                 event.preventDefault();
-                handleAdminLoginSubmit();
+                window.handleAdminLoginSubmit();
             }
         });
     }
@@ -50,23 +53,31 @@ async function initializeApplication() {
 
 function renderHeader() {
     const btn = document.getElementById("admin-action-btn");
-    btn.innerText = appState.isAdmin ? "Cerrar Modo Admin" : "Modo Administrador";
-    document.getElementById("admin-indicator").classList.toggle("hidden", !appState.isAdmin);
+    if (btn) btn.innerText = appState.isAdmin ? "Cerrar Modo Admin" : "Modo Administrador";
+    const indicator = document.getElementById("admin-indicator");
+    if (indicator) indicator.classList.toggle("hidden", !appState.isAdmin);
 }
 
 function renderActiveRulesPanel() { 
-    document.getElementById("active-rules-container").classList.toggle("hidden", !appState.isAdmin); 
+    const container = document.getElementById("active-rules-container");
+    if (container) container.classList.toggle("hidden", !appState.isAdmin); 
 }
 
-function toggleAdminMode() {
+/**
+ * EXPORTACIÓN EXPLÍCITA AL ÁMBITO GLOBAL (WINDOW) PARA ELIMINAR ERRORES INLINE DE GITHUB PAGES
+ */
+window.toggleAdminMode = function() {
     if (appState.isAdmin) { 
         appState.isAdmin = false; renderHeader(); renderActiveRulesPanel(); renderMainWorkspace(); 
     } else { 
-        document.getElementById("login-modal").classList.remove("hidden"); document.getElementById("admin-password-input").focus(); 
+        const modal = document.getElementById("login-modal");
+        if (modal) modal.classList.remove("hidden"); 
+        const input = document.getElementById("admin-password-input");
+        if (input) input.focus(); 
     }
-}
+};
 
-async function handleAdminLoginSubmit() {
+window.handleAdminLoginSubmit = async function() {
     const inp = document.getElementById("admin-password-input");
     if (!inp || !inp.value || inp.value.trim() === "") return;
 
@@ -76,28 +87,56 @@ async function handleAdminLoginSubmit() {
     
     if (hash === appState.config.adminPasswordHash) {
         appState.isAdmin = true; 
-        document.getElementById("login-modal").classList.add("hidden");
+        const modal = document.getElementById("login-modal");
+        if (modal) modal.classList.add("hidden");
         renderHeader(); renderActiveRulesPanel(); renderMainWorkspace(); renderEquidadWidget();
     } else { 
         alert("Acceso Denegado: Contraseña Incorrecta"); 
     }
-}
+};
 
-function switchView(v) { appState.currentView = v; renderMainWorkspace(); }
+window.openGeneratorRangeModal = function() {
+    if (!appState.isAdmin) {
+        alert("Acceso Restringido: Active el 'Modo Administrador' para configurar y ejecutar el Auto-Generador de turnos.");
+        return;
+    }
+    // Tolerancia de IDs: Busca tanto el formato por bloques como el estándar
+    const modal = document.getElementById("generator-modal") || document.getElementById("generator-range-modal");
+    if (modal) modal.classList.remove("hidden");
+};
+window.openGeneratorModal = window.openGeneratorRangeModal; // Mapeo de seguridad por si hay discrepancia en HTML
 
-function navigateTime(d) {
+window.openVacationManagementModal = function() { 
+    const modal = document.getElementById("vacation-modal");
+    if (modal) modal.classList.remove("hidden"); 
+    renderVacationModalList(); 
+};
+
+window.switchView = function(v) { appState.currentView = v; renderMainWorkspace(); };
+
+window.navigateTime = function(d) {
     if (appState.currentView === "month") appState.currentDate.setMonth(appState.currentDate.getMonth() + d);
     else appState.currentDate.setDate(appState.currentDate.getDate() + (d * 7));
     renderMainWorkspace();
-}
+};
 
 function renderMainWorkspace() {
     const title = document.getElementById("workspace-title");
-    const grid = document.getElementById("calendar-grid-workspace"); grid.innerHTML = "";
+    if (title) {
+        if (appState.currentView === "month") {
+            title.innerText = `${appState.currentDate.toLocaleString('es', {month:'long'})} ${appState.currentDate.getFullYear()}`.toUpperCase();
+        } else {
+            const mon = Utils.getMondayOfDate(appState.currentDate);
+            title.innerText = `SEMANA ${Utils.getWeekNumber(mon)} - ${mon.getFullYear()}`;
+        }
+    }
+    
+    const grid = document.getElementById("calendar-grid-workspace"); 
+    if (!grid) return;
+    grid.innerHTML = "";
     
     if (appState.currentView === "month") {
         const y = appState.currentDate.getFullYear(), m = appState.currentDate.getMonth();
-        title.innerText = `${appState.currentDate.toLocaleString('es', {month:'long'})} ${y}`.toUpperCase();
         grid.className = "grid grid-cols-7 gap-2";
         ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].forEach(h => grid.innerHTML += `<div class='text-center font-bold text-xs text-slate-500 py-1'>${h}</div>`);
         
@@ -108,7 +147,6 @@ function renderMainWorkspace() {
         }
     } else {
         const mon = Utils.getMondayOfDate(appState.currentDate);
-        title.innerText = `SEMANA ${Utils.getWeekNumber(mon)} - ${mon.getFullYear()}`;
         grid.className = "space-y-3";
         Utils.getDatesForWeekByMonday(mon).forEach(dStr => grid.innerHTML += buildWeeklyRowHtml(new Date(dStr), dStr));
     }
@@ -128,7 +166,7 @@ function buildDayCellHtml(date, dStr, targetMonth) {
     let borderAlert = dayData.hardViolation ? "border-rose-500/50 bg-rose-950/10" : "";
 
     return `
-        <div onclick="openManualEditModal('${dStr}')" class="calendar-grid-cell p-3 rounded-xl border ${borderAlert ? borderAlert : 'border-slate-800/80'} ${isCur && !borderAlert ? 'bg-slate-900' : !isCur && !borderAlert ? 'bg-slate-900/40 text-slate-600' : ''} cursor-pointer hover:border-indigo-500/50 tooltip-trigger relative group shadow-inner">
+        <div onclick="window.openManualEditModal('${dStr}')" class="calendar-grid-cell p-3 rounded-xl border ${borderAlert ? borderAlert : 'border-slate-800/80'} ${isCur && !borderAlert ? 'bg-slate-900' : !isCur && !borderAlert ? 'bg-slate-900/40 text-slate-600' : ''} cursor-pointer hover:border-indigo-500/50 tooltip-trigger relative group shadow-inner">
             <div class='flex justify-between items-center'><span class='text-xs font-bold'>${date.getDate()}</span>${badge}</div>
             <div class='mt-2 text-[10px] space-y-1'>
                 ${dayData.tarde.length > 0 ? `<div class='bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded truncate font-medium'>Tarde: ${dayData.tarde.length}</div>` : ''}
@@ -141,7 +179,7 @@ function buildDayCellHtml(date, dStr, targetMonth) {
                 <div class="font-bold text-indigo-400">${dStr}</div>
                 <div><span class="text-emerald-400 font-medium">Mañana:</span> ${mNames}</div>
                 <div><span class="text-indigo-400 font-medium">Tarde:</span> ${tNames}</div>
-                ${dayData.hardViolation ? `<div class="text-rose-400 font-bold pt-1 border-t border-slate-800">⚠️ Solapamiento: Forzado Fallback</div>` : ''}
+                ${dayData.hardViolation ? `<div class="text-rose-400 font-bold pt-1 border-t border-slate-800">⚠️ Ajuste Forzado de Guardia</div>` : ''}
             </div>
         </div>`;
 }
@@ -165,9 +203,16 @@ function buildWeeklyRowHtml(date, dStr) {
     </div>`;
 }
 
-function handleAutoGenerateTrigger() {
+window.handleAutoGenerateTrigger = function() {
     if(!appState.isAdmin) return alert("Acceso denegado: Habilite el modo Administrador.");
-    const s = document.getElementById("gen-start-date").value, e = document.getElementById("gen-end-date").value;
+    
+    // Tolerancia Absoluta de Formulario: Lee cualquier variación de nombres de inputs de fecha
+    const sInput = document.getElementById("gen-start-date") || document.getElementById("start-date");
+    const eInput = document.getElementById("gen-end-date") || document.getElementById("end-date");
+    
+    const s = sInput ? sInput.value : "";
+    const e = eInput ? eInput.value : "";
+    
     if(!s || !e) return alert("Por favor, introduzca un rango de fechas coherente.");
     
     let curr = Utils.getMondayOfDate(Utils.parseLocalDate(s));
@@ -186,12 +231,12 @@ function handleAutoGenerateTrigger() {
         } else {
             fallbackWarnings.push(`Semana ${Utils.getWeekNumber(curr)}: ${res.msg}`);
         }
-        // Avanzar el bucle de forma limpia instanciando una nueva referencia de fecha
         curr = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate() + 7, 0, 0, 0, 0);
     }
     
     GitHubSync.saveLocalState(appState); 
-    document.getElementById("generator-modal").classList.add("hidden"); // Hotfix: Cierre automático de modal añadido
+    const modal = document.getElementById("generator-modal") || document.getElementById("generator-range-modal");
+    if (modal) modal.classList.add("hidden"); 
     renderMainWorkspace(); 
     
     if (fallbackWarnings.length > 0) {
@@ -199,25 +244,28 @@ function handleAutoGenerateTrigger() {
     } else {
         alert(`Planificación completada con éxito para ${count} semanas sin conflictos.`);
     }
-}
-
-function openVacationManagementModal() { document.getElementById("vacation-modal").classList.remove("hidden"); renderVacationModalList(); }
+};
 
 function renderVacationModalList() {
-    const sel = document.getElementById("vac-user-select"); sel.innerHTML = "";
-    appState.users.forEach(u => sel.innerHTML += `<option value="${u.id}">${u.name}</option>`);
-    const list = document.getElementById("active-vacations-list"); list.innerHTML = "";
+    const sel = document.getElementById("vac-user-select"); 
+    if (sel) sel.innerHTML = "";
+    appState.users.forEach(u => { if (sel) sel.innerHTML += `<option value="${u.id}">${u.name}</option>`; });
+    
+    const list = document.getElementById("active-vacations-list"); 
+    if (list) list.innerHTML = "";
     appState.vacaciones.forEach((v, idx) => {
         const u = appState.users.find(user => user.id === v.userId);
-        list.innerHTML += `
-        <div class='flex justify-between items-center bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs'>
-            <span><strong class="text-indigo-400">${u?u.name:v.userId}</strong>: ${v.startDate} al ${v.endDate}</span>
-            ${appState.isAdmin?`<button onclick='removeVacationBlock(${idx})' class='text-rose-400 hover:text-rose-300 font-bold px-2'>Eliminar</button>`:''}
-        </div>`;
+        if (list) {
+            list.innerHTML += `
+            <div class='flex justify-between items-center bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs'>
+                <span><strong class="text-indigo-400">${u?u.name:v.userId}</strong>: ${v.startDate} al ${v.endDate}</span>
+                ${appState.isAdmin?`<button onclick='window.removeVacationBlock(${idx})' class='text-rose-400 hover:text-rose-300 font-bold px-2'>Eliminar</button>`:''}
+            </div>`;
+        }
     });
 }
 
-function handleAddVacationSubmit() {
+window.handleAddVacationSubmit = function() {
     if(!appState.isAdmin) return alert("Acción protegida. Entre en modo admin.");
     const uid = document.getElementById("vac-user-select").value, s = document.getElementById("vac-start-date").value, e = document.getElementById("vac-end-date").value;
     if(!s || !e) return alert("Rellene los campos obligatorios.");
@@ -229,16 +277,19 @@ function handleAddVacationSubmit() {
     }
     appState.vacaciones.push({ userId: uid, startDate: s, endDate: e });
     GitHubSync.saveLocalState(appState); renderVacationModalList(); renderMainWorkspace();
-}
+};
 
-function removeVacationBlock(idx) { appState.vacaciones.splice(idx,1); GitHubSync.saveLocalState(appState); renderVacationModalList(); renderMainWorkspace(); }
+window.removeVacationBlock = function(idx) { appState.vacaciones.splice(idx,1); GitHubSync.saveLocalState(appState); renderVacationModalList(); renderMainWorkspace(); };
 
 let activeManualDate = "";
-function openManualEditModal(dStr) {
+window.openManualEditModal = function(dStr) {
     if(!appState.isAdmin) return; activeManualDate = dStr;
-    document.getElementById("manual-edit-modal-title").innerText = `Edición Manual: ${dStr}`;
+    const title = document.getElementById("manual-edit-modal-title");
+    if (title) title.innerText = `Edición Manual: ${dStr}`;
     const dayData = appState.schedule[dStr] || { mañana: [], tarde: [], vacaciones: [] };
-    const cont = document.getElementById("manual-users-assignment-list"); cont.innerHTML = "";
+    const cont = document.getElementById("manual-users-assignment-list"); 
+    if (!cont) return;
+    cont.innerHTML = "";
     appState.users.forEach(u => {
         let cur = "libre"; if(dayData.mañana.includes(u.id)) cur = "mañana"; else if(dayData.tarde.includes(u.id)) cur = "tarde";
         cont.innerHTML += `
@@ -247,21 +298,29 @@ function openManualEditModal(dStr) {
             <select id='manual-sel-${u.id}' class='bg-slate-950 border border-slate-700 text-white rounded-lg p-1 text-xs focus:outline-none'><option value='mañana' ${cur==='mañana'?'selected':''}>Mañana</option><option value='tarde' ${cur==='tarde'?'selected':''}>Tarde</option><option value='libre' ${cur==='libre'?'selected':''}>Libre</option></select>
         </div>`;
     });
-    document.getElementById("manual-edit-modal").classList.remove("hidden");
-}
+    const modal = document.getElementById("manual-edit-modal");
+    if (modal) modal.classList.remove("hidden");
+};
 
-function handleSaveManualEditSubmit() {
+window.handleSaveManualEditSubmit = function() {
     const dStr = activeManualDate; const dayData = { mañana: [], tarde: [], vacaciones: [] };
     appState.users.forEach(u => {
-        const val = document.getElementById(`manual-sel-${u.id}`).value;
-        if(val === "mañana") dayData.mañana.push(u.id); else if(val === "tarde") dayData.tarde.push(u.id);
+        const selectEl = document.getElementById(`manual-sel-${u.id}`);
+        if (selectEl) {
+            const val = selectEl.value;
+            if(val === "mañana") dayData.mañana.push(u.id); else if(val === "tarde") dayData.tarde.push(u.id);
+        }
     });
     appState.schedule[dStr] = dayData; GitHubSync.saveLocalState(appState);
-    document.getElementById("manual-edit-modal").classList.add("hidden"); renderMainWorkspace();
-}
+    const modal = document.getElementById("manual-edit-modal");
+    if (modal) modal.classList.add("hidden"); 
+    renderMainWorkspace();
+};
 
 function renderEquidadWidget() {
-    const cont = document.getElementById("equidad-widget-container"); cont.innerHTML = "";
+    const cont = document.getElementById("equidad-widget-container"); 
+    if (!cont) return;
+    cont.innerHTML = "";
     const stats = Report.compileStats(appState, "2026-01-01", "2026-12-31");
     Object.values(stats).forEach(s => {
         cont.innerHTML += `
@@ -271,3 +330,10 @@ function renderEquidadWidget() {
         </div>`;
     });
 }
+
+window.handleExportDropdownAction = function(mode) {
+    if(mode === 'month') {
+        const y = appState.currentDate.getFullYear(), m = appState.currentDate.getMonth();
+        Report.exportCSV(appState, Utils.formatDate(new Date(y,m,1)), Utils.formatDate(new Date(y,m+1,0)), "Mensual");
+    } else { Report.exportCSV(appState, "2026-01-01", "2026-12-31", "Anual"); }
+};
