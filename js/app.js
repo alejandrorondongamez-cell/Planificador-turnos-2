@@ -32,11 +32,13 @@ async function initializeApplication() {
         console.error("Error crítico de inicialización de datos desde el repositorio:", e); 
     }
 
-    // Interceptor dinámico para habilitar el inicio de sesión con la tecla Enter de forma nativa
+    // Interceptor dinámico controlado para evitar la duplicación de eventos de la tecla Enter
     const passwordInput = document.getElementById("admin-password-input");
     if (passwordInput) {
+        passwordInput.removeAttribute("onkeydown"); // Eliminamos posibles residuos inline redundantes
         passwordInput.addEventListener("keydown", (event) => {
             if (event.key === "Enter") {
+                event.preventDefault();
                 handleAdminLoginSubmit();
             }
         });
@@ -65,11 +67,20 @@ function toggleAdminMode() {
 
 async function handleAdminLoginSubmit() {
     const inp = document.getElementById("admin-password-input");
-    const hash = await Utils.hashPassword(inp.value); inp.value = "";
+    if (!inp || !inp.value || inp.value.trim() === "") return; // Protección total contra la doble ejecución vacía
+
+    const plainPassword = inp.value;
+    inp.value = ""; // Limpieza inmediata del campo de texto por máxima seguridad corporativa
+    
+    const hash = await Utils.hashPassword(plainPassword);
+    
     if (hash === appState.config.adminPasswordHash) {
-        appState.isAdmin = true; document.getElementById("login-modal").classList.add("hidden");
-        renderHeader(); renderActiveRulesPanel(); renderMainWorkspace();
-    } else { alert("Acceso Denegado: Contraseña Incorrecta"); }
+        appState.isAdmin = true; 
+        document.getElementById("login-modal").classList.add("hidden");
+        renderHeader(); renderActiveRulesPanel(); renderMainWorkspace(); renderEquidadWidget();
+    } else { 
+        alert("Acceso Denegado: Contraseña Incorrecta"); 
+    }
 }
 
 function switchView(v) { appState.currentView = v; renderMainWorkspace(); }
