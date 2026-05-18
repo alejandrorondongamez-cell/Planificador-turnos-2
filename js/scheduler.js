@@ -1,6 +1,6 @@
 /**
  * AEQUITAS WFM - CORE SCHEDULING ENGINE
- * ROMS & HARD CONSTRAINT CASCADING VALIDATOR - VERSION v0.5 PRO
+ * WEEKEND EXCLUSION & HARD CONSTRAINT CASCADING VALIDATOR - VERSION v0.6 PRO
  */
 const Scheduler = {
     generateWeeklyBlock(mondayDate, state) {
@@ -37,7 +37,7 @@ const Scheduler = {
         let minCombinedScore = Infinity;
         let hardViolationTriggered = false;
 
-        // TIER 1: Buscar combinación corporativa perfecta (1 Senior + 1 Standard) respetando restricciones duras
+        // TIER 1: Combinación perfecta (1 Senior + 1 Standard) respetando restricciones duras
         for (let s of seniors) {
             for (let st of standards) {
                 const sPen = this.calculateTechnicianPenalty(s, historyStats[s.id], weekNum, config);
@@ -51,7 +51,7 @@ const Scheduler = {
             }
         }
 
-        // TIER 2: Si no hay par ideal por vacaciones, forzar par (Senior+Standard) asumiendo penalización controlada
+        // TIER 2: Si no hay par ideal, forzar par asumiendo penalización controlada
         if (!bestPair) {
             minCombinedScore = Infinity;
             for (let s of seniors) {
@@ -69,7 +69,7 @@ const Scheduler = {
             }
         }
 
-        // TIER 3: Emergencia total por ausencias simultáneas (Asignar cualquier par disponible)
+        // TIER 3: Emergencia total por ausencias (Cualquier par disponible)
         if (!bestPair) {
             hardViolationTriggered = true;
             if (availableTechs.length >= 2) {
@@ -98,9 +98,17 @@ const Scheduler = {
         const weeklyAssignments = {};
         weekDates.forEach(dateStr => {
             const dayHoliday = holidays[dateStr];
+            const parsedDate = Utils.parseLocalDate(dateStr);
+            const isWeekend = parsedDate.getDay() === 0 || parsedDate.getDay() === 6; // 0 = Domingo, 6 = Sábado
             
-            if (dayHoliday && dayHoliday.type === "global") {
-                weeklyAssignments[dateStr] = { mañana: [], tarde: [], vacaciones: users.map(u => u.id), hardViolation: false };
+            // Si es fin de semana (Sábado/Domingo) o Cierre Global, NO se trabaja. 0 turnos asignados.
+            if (isWeekend || (dayHoliday && dayHoliday.type === "global")) {
+                const vacationTeam = [];
+                users.forEach(u => {
+                    const isOnVacation = state.vacaciones && state.vacaciones.some(v => v.startDate <= dateStr && v.endDate >= dateStr && v.userId === u.id);
+                    if (isOnVacation) vacationTeam.push(u.id);
+                });
+                weeklyAssignments[dateStr] = { mañana: [], tarde: [], vacaciones: vacationTeam, hardViolation: false };
                 return;
             }
 
@@ -129,7 +137,7 @@ const Scheduler = {
             success: true, 
             assignments: weeklyAssignments, 
             hardViolation: hardViolationTriggered,
-            msg: "Asignación forzada bajo balanceo por contingencia de vacaciones."
+            msg: "Asignación completada de lunes a viernes."
         };
     },
 
