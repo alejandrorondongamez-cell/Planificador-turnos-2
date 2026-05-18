@@ -1,6 +1,6 @@
 /**
  * AEQUITAS WFM - MAIN VIEW PORT CONTROLLER
- * GLOBAL SCOPE INJECTION ARCHITECTURE - VERSION v0.5 PRO
+ * VISUAL BADGES & WEEKEND SHADING INJECTION - VERSION v0.6 PRO
  */
 let appState = { users: [], holidays: [], config: {}, schedule: {}, vacaciones: [], currentDate: new Date("2026-07-01"), currentView: "month", isAdmin: false };
 
@@ -11,7 +11,6 @@ async function initializeApplication() {
     const cacheBust = `?v=${Date.now()}`;
     
     try {
-        // Sincronización limpia: Forzar siempre la lectura de los archivos estructurales desde GitHub sin caché
         const [cRes, uRes, hRes] = await Promise.all([
             fetch(`data/config.json${cacheBust}`),
             fetch(`data/users.json${cacheBust}`),
@@ -22,7 +21,6 @@ async function initializeApplication() {
         appState.users = await uRes.json();
         appState.holidays = await hRes.json();
 
-        // Cargar únicamente el estado operativo editable (cuadrantes y vacaciones) desde la memoria local
         if (local) {
             appState.schedule = local.schedule || {};
             appState.vacaciones = local.vacaciones || [];
@@ -36,7 +34,6 @@ async function initializeApplication() {
         console.error("Error crítico de inicialización de datos desde el repositorio:", e); 
     }
 
-    // Interceptor dinámico controlado para evitar la duplicación de eventos de la tecla Enter
     const passwordInput = document.getElementById("admin-password-input");
     if (passwordInput) {
         passwordInput.removeAttribute("onkeydown");
@@ -63,9 +60,6 @@ function renderActiveRulesPanel() {
     if (container) container.classList.toggle("hidden", !appState.isAdmin); 
 }
 
-/**
- * EXPORTACIÓN EXPLÍCITA AL ÁMBITO GLOBAL (WINDOW) PARA ELIMINAR ERRORES INLINE DE GITHUB PAGES
- */
 window.toggleAdminMode = function() {
     if (appState.isAdmin) { 
         appState.isAdmin = false; renderHeader(); renderActiveRulesPanel(); renderMainWorkspace(); 
@@ -100,11 +94,10 @@ window.openGeneratorRangeModal = function() {
         alert("Acceso Restringido: Active el 'Modo Administrador' para configurar y ejecutar el Auto-Generador de turnos.");
         return;
     }
-    // Tolerancia de IDs: Busca tanto el formato por bloques como el estándar
     const modal = document.getElementById("generator-modal") || document.getElementById("generator-range-modal");
     if (modal) modal.classList.remove("hidden");
 };
-window.openGeneratorModal = window.openGeneratorRangeModal; // Mapeo de seguridad por si hay discrepancia en HTML
+window.openGeneratorModal = window.openGeneratorRangeModal;
 
 window.openVacationManagementModal = function() { 
     const modal = document.getElementById("vacation-modal");
@@ -157,21 +150,47 @@ function buildDayCellHtml(date, dStr, targetMonth) {
     const isCur = date.getMonth() === targetMonth;
     const hol = appState.holidays[dStr];
     const dayData = appState.schedule[dStr] || { mañana: [], tarde: [], vacaciones: [] };
-    let badge = hol ? `<span class='text-[9px] px-1.5 py-0.5 rounded font-bold uppercase truncate ${hol.type==='legal'?'bg-amber-500/20 text-amber-300 border border-amber-500/30':hol.type==='global'?'bg-rose-500/20 text-rose-300 border border-rose-500/30':'bg-blue-500/20 text-blue-300 border border-blue-500/30'}'>${hol.type}</span>` : "";
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6; // Sábado o Domingo
+    
+    // Renderizado dinámico de etiquetas de Festivos (Nacionales / Autonómicos / Locales)
+    let badge = "";
+    if (hol) {
+        const displayLabel = hol.name || hol.type;
+        badge = `<span class='text-[9px] px-1.5 py-0.5 rounded font-bold uppercase truncate ${hol.type==='legal'?'bg-amber-500/20 text-amber-300 border border-amber-500/30':hol.type==='global'?'bg-rose-500/20 text-rose-300 border border-rose-500/30':'bg-blue-500/20 text-blue-300 border border-blue-500/30'}' title="${displayLabel}">${displayLabel}</span>`;
+    }
+    
     const vCount = appState.vacaciones.filter(v => v.startDate <= dStr && v.endDate >= dStr).length;
     
     const mNames = dayData.mañana.map(id => appState.users.find(u => u.id === id)?.name || id).join(', ') || 'Ninguno';
     const tNames = dayData.tarde.map(id => appState.users.find(u => u.id === id)?.name || id).join(', ') || 'Ninguno';
 
-    let borderAlert = dayData.hardViolation ? "border-rose-500/50 bg-rose-950/10" : "";
+    // Inyección de cajas de conteo visibles en la cuadrícula para ambos turnos (Mañana y Tarde)
+    let shiftsBadgesHtml = "";
+    if (dayData.mañana && dayData.mañana.length > 0) {
+        shiftsBadgesHtml += `<div class='bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded truncate font-medium text-[10px] mb-1'>Mañana: ${dayData.mañana.length}</div>`;
+    }
+    if (dayData.tarde && dayData.tarde.length > 0) {
+        shiftsBadgesHtml += `<div class='bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded truncate font-medium text-[10px]'>Tarde: ${dayData.tarde.length}</div>`;
+    }
+
+    // Lógica estructural de sombreado rayado (Zebra-striping nativo para fines de semana)
+    let cellStyleAttribute = "";
+    let baseCellClass = isCur ? "bg-slate-900" : "bg-slate-900/40 text-slate-600";
+    
+    if (isWeekend) {
+        baseCellClass = "text-slate-500 border-dashed border-slate-800/60";
+        cellStyleAttribute = `style="background: repeating-linear-gradient(45deg, #0b0f19, #0b0f19 8px, #151e2e 8px, #151e2e 16px);"`;
+    }
+
+    let borderAlert = dayData.hardViolation ? "border-rose-500/50 bg-rose-950/10" : "border-slate-800/80";
 
     return `
-        <div onclick="window.openManualEditModal('${dStr}')" class="calendar-grid-cell p-3 rounded-xl border ${borderAlert ? borderAlert : 'border-slate-800/80'} ${isCur && !borderAlert ? 'bg-slate-900' : !isCur && !borderAlert ? 'bg-slate-900/40 text-slate-600' : ''} cursor-pointer hover:border-indigo-500/50 tooltip-trigger relative group shadow-inner">
+        <div onclick="window.openManualEditModal('${dStr}')" ${cellStyleAttribute} class="calendar-grid-cell p-3 rounded-xl border ${borderAlert} ${baseCellClass} cursor-pointer hover:border-indigo-500/50 tooltip-trigger relative group shadow-inner min-h-[105px]">
             <div class='flex justify-between items-center'><span class='text-xs font-bold'>${date.getDate()}</span>${badge}</div>
-            <div class='mt-2 text-[10px] space-y-1'>
-                ${dayData.tarde.length > 0 ? `<div class='bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded truncate font-medium'>Tarde: ${dayData.tarde.length}</div>` : ''}
+            <div class='mt-2 space-y-0.5'>
+                ${shiftsBadgesHtml}
             </div>
-            <div class='absolute bottom-2 left-3 right-3 flex justify-between text-[10px] text-slate-500 border-t border-slate-800/60 pt-1'>
+            <div class='absolute bottom-2 left-3 right-3 flex justify-between text-[9px] text-slate-500 border-t border-slate-800/60 pt-1'>
                 <span>M:${dayData.mañana.length} T:${dayData.tarde.length}</span>
                 ${vCount > 0 ? `<span class='text-rose-400 font-bold bg-rose-500/10 px-1 rounded text-[9px]'>V:${vCount}</span>` : ''}
             </div>
@@ -186,9 +205,9 @@ function buildDayCellHtml(date, dStr, targetMonth) {
 
 function buildWeeklyRowHtml(date, dStr) {
     const dayData = appState.schedule[dStr] || { mañana: [], tarde: [], vacaciones: [] };
-    const mN = dayData.mañana.map(id => appState.users.find(u=>u.id===id)?.name || id).join(', ') || 'Ninguno';
-    const tN = dayData.tarde.map(id => appState.users.find(u=>u.id===id)?.name || id).join(', ') || 'Ninguno';
-    const vN = appState.vacaciones.filter(v => v.startDate <= dStr && v.endDate >= dStr).map(v => appState.users.find(u=>u.id===v.userId)?.name || v.userId).join(', ') || 'Ninguno';
+    const mN = dayData.mañana.map(id => appState.users.find(u => u.id === id)?.name || id).join(', ') || 'Ninguno';
+    const tN = dayData.tarde.map(id => appState.users.find(u => u.id === id)?.name || id).join(', ') || 'Ninguno';
+    const vN = appState.vacaciones.filter(v => v.startDate <= dStr && v.endDate >= dStr).map(v => appState.users.find(u => u.id === v.userId)?.name || v.userId).join(', ') || 'Ninguno';
     return `
     <div class='bg-slate-900 border border-slate-800 rounded-xl p-4 flex gap-4 text-xs shadow-md hover:border-slate-700/60 transition'>
         <div class='w-1/4 font-bold text-slate-300 flex flex-col justify-center'>
@@ -206,7 +225,6 @@ function buildWeeklyRowHtml(date, dStr) {
 window.handleAutoGenerateTrigger = function() {
     if(!appState.isAdmin) return alert("Acceso denegado: Habilite el modo Administrador.");
     
-    // Tolerancia Absoluta de Formulario: Lee cualquier variación de nombres de inputs de fecha
     const sInput = document.getElementById("gen-start-date") || document.getElementById("start-date");
     const eInput = document.getElementById("gen-end-date") || document.getElementById("end-date");
     
@@ -240,9 +258,9 @@ window.handleAutoGenerateTrigger = function() {
     renderMainWorkspace(); 
     
     if (fallbackWarnings.length > 0) {
-        alert(`Planificación procesada para ${count} semanas.\n\n[AVISO DE AJUSTE MANUAL]:\n` + fallbackWarnings.join("\n"));
+        alert(`Planificación de días laborables procesada para ${count} semanas.\n\n[AVISO]: Fines de semana excluidos.\n` + fallbackWarnings.join("\n"));
     } else {
-        alert(`Planificación completada con éxito para ${count} semanas sin conflictos.`);
+        alert(`Planificación completada con éxito de lunes a viernes para ${count} semanas.`);
     }
 };
 
@@ -315,7 +333,7 @@ window.handleSaveManualEditSubmit = function() {
     const modal = document.getElementById("manual-edit-modal");
     if (modal) modal.classList.add("hidden"); 
     renderMainWorkspace();
-};
+}
 
 function renderEquidadWidget() {
     const cont = document.getElementById("equidad-widget-container"); 
