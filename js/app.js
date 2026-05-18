@@ -4,25 +4,44 @@ document.addEventListener("DOMContentLoaded", async () => { await initializeAppl
 
 async function initializeApplication() {
     const local = GitHubSync.loadLocalState();
+    const cacheBust = `?v=${Date.now()}`;
+    
     try {
-        // Hotfix: Forzar siempre la lectura del archivo config.json fresco desde el servidor
-        const cRes = await fetch("data/config.json"); 
-        const freshConfig = await cRes.json();
+        // Sincronización limpia: Forzar siempre la lectura de los archivos estructurales desde GitHub sin caché
+        const [cRes, uRes, hRes] = await Promise.all([
+            fetch(`data/config.json${cacheBust}`),
+            fetch(`data/users.json${cacheBust}`),
+            fetch(`data/holidays.json${cacheBust}`)
+        ]);
+        
+        appState.config = await cRes.json();
+        appState.users = await uRes.json();
+        appState.holidays = await hRes.json();
 
-        if (local) { 
-            appState = { ...appState, ...local }; 
-            appState.currentDate = new Date(appState.currentDate); 
-            // Sobrescribimos la configuración con la del archivo real para evitar bloqueos por caché local
-            appState.config = freshConfig;
+        // Cargar únicamente el estado operativo editable (cuadrantes y vacaciones) desde la memoria local
+        if (local) {
+            appState.schedule = local.schedule || {};
+            appState.vacaciones = local.vacaciones || [];
+            if (local.currentDate) appState.currentDate = new Date(local.currentDate);
         } else {
-            const uRes = await fetch("data/users.json"); appState.users = await uRes.json();
-            const hRes = await fetch("data/holidays.json"); appState.holidays = await hRes.json();
-            appState.config = freshConfig;
+            appState.schedule = {};
+            appState.vacaciones = [];
             GitHubSync.saveLocalState(appState);
         }
     } catch(e) { 
-        console.error("Error al inicializar la base de datos estática:", e); 
+        console.error("Error crítico de inicialización de datos desde el repositorio:", e); 
     }
+
+    // Interceptor dinámico para habilitar el inicio de sesión con la tecla Enter de forma nativa
+    const passwordInput = document.getElementById("admin-password-input");
+    if (passwordInput) {
+        passwordInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                handleAdminLoginSubmit();
+            }
+        });
+    }
+
     renderHeader(); renderActiveRulesPanel(); renderMainWorkspace(); renderEquidadWidget();
 }
 
