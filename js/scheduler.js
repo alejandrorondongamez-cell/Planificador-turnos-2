@@ -7,8 +7,7 @@ const Scheduler = {
         const currentYear = mondayDate.getFullYear();
         const weekNum = Utils.getWeekNumber(mondayDate);
         
-        const midWeekDate = new Date(mondayDate);
-        midWeekDate.setDate(mondayDate.getDate() + 3);
+        const midWeekDate = new Date(mondayDate.getFullYear(), mondayDate.getMonth(), mondayDate.getDate() + 3);
         const currentMonth = midWeekDate.getMonth();
 
         const unavailableTechs = new Set();
@@ -27,7 +26,9 @@ const Scheduler = {
 
         let bestPair = null;
         let minCombinedScore = Infinity;
+        let hardViolationTriggered = false;
 
+        // Intentar emparejamiento óptimo normativo (1 Senior + 1 Standard)
         for (let s of seniors) {
             for (let st of standards) {
                 const sPen = this.calculateTechnicianPenalty(s, historyStats[s.id], weekNum, config);
@@ -41,11 +42,29 @@ const Scheduler = {
             }
         }
 
+        // Sistema de Fallback Resiliente: Si las vacaciones impiden un par limpio, calcula el par menos perjudicial y avisa
         if (!bestPair || minCombinedScore >= config.scoringWeights.consecutiveTarde) {
-            return {
-                success: false,
-                msg: "Restricción dura violada. Intervención manual requerida."
-            };
+            hardViolationTriggered = true;
+            if (availableTechs.length >= 2) {
+                minCombinedScore = Infinity;
+                for (let i = 0; i < availableTechs.length; i++) {
+                    for (let j = i + 1; j < availableTechs.length; j++) {
+                        const t1 = availableTechs[i];
+                        const t2 = availableTechs[j];
+                        const p1 = this.calculateTechnicianPenalty(t1, historyStats[t1.id], weekNum, config);
+                        const p2 = this.calculateTechnicianPenalty(t2, historyStats[t2.id], weekNum, config);
+                        let totalFallbackScore = p1.score + p2.score;
+                        if (totalFallbackScore < minCombinedScore) {
+                            minCombinedScore = totalFallbackScore;
+                            bestPair = { senior: t1, standard: t2 };
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!bestPair) {
+            return { success: false, msg: "Fallo crítico: Personal insuficiente disponible para cubrir el servicio operativo." };
         }
 
         const weeklyAssignments = {};
@@ -71,11 +90,17 @@ const Scheduler = {
             weeklyAssignments[dateStr] = {
                 mañana: morningTeam,
                 tarde: afternoonTeam,
-                vacaciones: vacationTeam
+                vacaciones: vacationTeam,
+                hardViolation: hardViolationTriggered
             };
         });
 
-        return { success: true, assignments: weeklyAssignments };
+        return { 
+            success: true, 
+            assignments: weeklyAssignments, 
+            hardViolation: hardViolationTriggered,
+            msg: "Conflicto por bajas/vacaciones. Forzada combinación de recurso disponible (Ajuste manual recomendado)."
+        };
     },
 
     calculateTechnicianPenalty(tech, stats, targetWeek, config) {
@@ -96,25 +121,31 @@ const Scheduler = {
         });
 
         const processedWeeks = new Set();
-        Object.keys(state.schedule).forEach(dateStr => {
-            const d = new Date(dateStr);
+        Object.keys(state.schedule).sort().forEach(dateStr => {
+            const d = Utils.parseLocalDate(dateStr);
             if (d.getFullYear() !== year) return;
             const wk = Utils.getWeekNumber(d);
             if (wk >= targetWeek) return;
 
             const dayObj = state.schedule[dateStr];
+            if (!dayObj || !dayObj.tarde) return;
+
             dayObj.tarde.forEach(uid => {
                 if (!stats[uid]) return;
-                if (!processedWeeks.has(`${wk}-${uid}`)) {
+                
+                if (!processedWeeks.has(`annual-${wk}-${uid}`)) {
                     stats[uid].annualTardeWeeks++;
-                    processedWeeks.add(`${wk}-${uid}`);
+                    processedWeeks.add(`annual-${wk}-${uid}`);
                 }
+                
                 if (wk === targetWeek - 1) stats[uid].lastWeekTarde = wk;
                 
-                const mid = new Date(d); mid.setDate(mid.getDate() + 3);
-                if (mid.getMonth() === targetMonth && !processedWeeks.has(`m-${wk}-${uid}`)) {
-                    stats[uid].tardeWeeksInCurrentMonth++;
-                    processedWeeks.add(`m-${wk}-${uid}`);
+                const mid = new Date(d.getFullYear(), d.getMonth(), d.getDate() + (4 - (d.getDay() || 7)));
+                if (mid.getMonth() === targetMonth) {
+                    if (!processedWeeks.has(`month-${wk}-${uid}`)) {
+                        stats[uid].tardeWeeksInCurrentMonth++;
+                        processedWeeks.add(`m-${wk}-${uid}`);
+                    }
                 }
                 if (state.holidays[dateStr] && state.holidays[dateStr].type === "legal") {
                     stats[uid].annualLegalHolidaysWorked++;
